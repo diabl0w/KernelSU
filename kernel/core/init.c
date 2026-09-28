@@ -27,6 +27,7 @@
 #include "feature/adb_root.h"
 #include "feature/selinux_hide.h"
 #include "infra/symbol_resolver.h"
+#include "compat/samsung_defex.h"
 
 #if defined(__x86_64__) && !defined(CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER)
 #include <asm/cpufeature.h>
@@ -143,6 +144,13 @@ int __init kernelsu_init(void)
         return -ENOSYS;
     }
 
+    ret = ksu_samsung_defex_init();
+    if (ret) {
+        ksu_put_cred(ksu_cred);
+        ksu_samsung_kdp_exit();
+        return ret;
+    }
+
     ksu_syscall_hook_init();
 
     ksu_feature_init();
@@ -229,6 +237,7 @@ void __exit kernelsu_exit(void)
     ksu_sulog_exit();
     ksu_feature_exit();
 
+    ksu_samsung_defex_exit();
     ksu_put_cred(ksu_cred);
     ksu_samsung_kdp_exit();
 }
