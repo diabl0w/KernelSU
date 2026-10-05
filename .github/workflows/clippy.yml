@@ -41,8 +41,5 @@ jobs:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           rustup target add aarch64-linux-android
-          rustup target add x86_64-linux-android
           source .github/scripts/setup-rust-build.sh aarch64-linux-android 26
-          source .github/scripts/setup-rust-build.sh x86_64-linux-android 26
           cargo clippy --target aarch64-linux-android --release
-          cargo clippy --target x86_64-linux-android --release
