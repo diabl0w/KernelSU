@@ -17,6 +17,7 @@
 #include "hook/syscall_hook_manager.h"
 #include "hook/tp_marker.h"
 #include "feature/sucompat.h"
+#include "feature/adb_root.h"
 #include "hook/setuid_hook.h"
 #include "hook/syscall_hook.h"
 #include "hook/syscall_event_bridge.h"
@@ -44,6 +45,10 @@ static bool rkp_sucompat_should_redirect(int syscall_nr)
         syscall_regs->syscallno = syscall_nr;
         return false;
     }
+
+    if (static_branch_unlikely(&ksu_adb_root) &&
+        (syscall_nr == __NR_execve || syscall_nr == __NR_execveat))
+        return true;
 
     return ksu_su_compat_enabled &&
            ksu_is_allow_uid_for_current(current_uid().val);
