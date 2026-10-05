@@ -1,10 +1,9 @@
 use anyhow::{Context, Result};
 use log::{info, warn};
 use rustix::cstr;
-use std::{process::Command, time::Instant};
+use std::process::Command;
 
-use crate::module::{ScriptWait, handle_updated_modules, prune_modules};
-use crate::{assets, defs, init_event, metamodule, restorecon, utils};
+use crate::{assets, utils};
 
 fn dump_process_info(label: &str) {
     use rustix::process::{getgid, getgroups, getpid, getuid};
@@ -35,7 +34,7 @@ fn dump_process_info(label: &str) {
     );
 }
 
-pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Result<()> {
+pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool, soft_reboot: bool) -> Result<()> {
     utils::daemonize(false)?;
     info!("late-load command triggered!");
     dump_process_info("late-load start");
@@ -70,7 +69,7 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
     }
 
     // We need to reset stdin/stdout/stderr; otherwise, sending file descriptors via cmd transactions
-    // will be blocked by SELinux because its fsec->sid is still u:r:su:s0 instead of u:r:ksu:s0.
+    // will be blocked by SELinux because its fsec->sid is still u:r:vendor_modprobe:s0 instead of u:r:ksu:s0.
     utils::reset_std()?;
 
     utils::umask(0);
@@ -81,68 +80,23 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
 
     utils::install(None, None).context("Failed to install ksud")?;
 
-    // 5. Handle module updates
-    if let Err(e) = handle_updated_modules() {
-        warn!("handle updated modules failed: {e}");
+    // This seciton previously ran module scripts, 
+    // but we don't care about modules in late-load
+    // Modules will be loaded after soft reboot instead
+    if !soft_reboot {
+        info!("Restarting KernelSU Manager {package_name}...");
+        let _ = Command::new("am")
+            .args(["force-stop", package_name])
+            .status();
+        let _ = Command::new("am")
+            .args([
+                "start",
+                "-n",
+                &format!("{package_name}/me.weishu.kernelsu.ui.MainActivity"),
+            ])
+            .status();
     }
 
-    if let Err(e) = prune_modules() {
-        warn!("prune modules failed: {e}");
-    }
-
-    if let Err(e) = restorecon::restorecon() {
-        warn!("restorecon failed: {e}");
-    }
-
-    // 6. Load SELinux rules
-    if crate::module::load_sepolicy_rule().is_err() {
-        warn!("load sepolicy.rule failed");
-    }
-
-    if let Err(e) = crate::profile::apply_sepolies() {
-        warn!("apply root profile sepolicy failed: {e}");
-    }
-
-    // 7. Initialize features
-    if let Err(e) = crate::feature::init_features() {
-        warn!("init features failed: {e}");
-    }
-
-    // 8. Execute late-load stage scripts with a shared boot deadline
-    let wait = ScriptWait::Until(Instant::now() + defs::BOOT_STAGE_TIMEOUT);
-    init_event::run_stage("late-load", wait);
-
-    // 9. Load system.prop
-    if let Err(e) = crate::module::load_system_prop() {
-        warn!("load system.prop failed: {e}");
-    }
-
-    // 10. Execute metamodule mount script (OverlayFS)
-    if let Err(e) = metamodule::exec_mount_script(defs::MODULE_DIR) {
-        warn!("execute metamodule mount failed: {e}");
-    }
-
-    // 11. Execute post-mount stage scripts using the same deadline
-    init_event::run_stage("post-mount", wait);
-
-    // 12. Execute service stage scripts (non-blocking)
-    init_event::run_stage("service", ScriptWait::NoWait);
-
-    // 13. Execute boot-completed stage scripts (non-blocking)
-    init_event::run_stage("boot-completed", ScriptWait::NoWait);
-
-    // 14. Restart Manager so it gets a fresh ksu fd from the newly loaded kernel module
-    info!("Restarting KernelSU Manager {package_name}...");
-    let _ = Command::new("am")
-        .args(["force-stop", package_name])
-        .status();
-    let _ = Command::new("am")
-        .args([
-            "start",
-            "-n",
-            &format!("{package_name}/me.weishu.kernelsu.ui.MainActivity"),
-        ])
-        .status();
 
     Ok(())
 }
