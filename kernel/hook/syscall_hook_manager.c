@@ -45,8 +45,7 @@ static bool rkp_sucompat_should_redirect(int syscall_nr)
         return false;
     }
 
-    return ksu_su_compat_enabled &&
-           ksu_is_allow_uid_for_current(current_uid().val);
+    return ksu_su_compat_enabled && ksu_is_allow_uid_for_current(current_uid().val);
 }
 
 static long __nocfi rkp_sucompat_execve(const struct pt_regs *regs)
@@ -172,16 +171,11 @@ static int rkp_sucompat_hook_init(void)
     if (!ksu_syscall_table)
         return -ENOENT;
 
-    rkp_sucompat_execve_kprobe.addr =
-        (kprobe_opcode_t *)READ_ONCE(ksu_syscall_table[__NR_execve]);
-    rkp_sucompat_newfstatat_kprobe.addr =
-        (kprobe_opcode_t *)READ_ONCE(ksu_syscall_table[__NR_newfstatat]);
-    rkp_sucompat_faccessat_kprobe.addr =
-        (kprobe_opcode_t *)READ_ONCE(ksu_syscall_table[__NR_faccessat]);
-    rkp_sucompat_statx_kprobe.addr =
-        (kprobe_opcode_t *)READ_ONCE(ksu_syscall_table[__NR_statx]);
-    rkp_sucompat_faccessat2_kprobe.addr =
-        (kprobe_opcode_t *)READ_ONCE(ksu_syscall_table[__NR_faccessat2]);
+    rkp_sucompat_execve_kprobe.addr = (kprobe_opcode_t *)READ_ONCE(ksu_syscall_table[__NR_execve]);
+    rkp_sucompat_newfstatat_kprobe.addr = (kprobe_opcode_t *)READ_ONCE(ksu_syscall_table[__NR_newfstatat]);
+    rkp_sucompat_faccessat_kprobe.addr = (kprobe_opcode_t *)READ_ONCE(ksu_syscall_table[__NR_faccessat]);
+    rkp_sucompat_statx_kprobe.addr = (kprobe_opcode_t *)READ_ONCE(ksu_syscall_table[__NR_statx]);
+    rkp_sucompat_faccessat2_kprobe.addr = (kprobe_opcode_t *)READ_ONCE(ksu_syscall_table[__NR_faccessat2]);
 
     ksu_sucompat_init();
 
@@ -233,8 +227,7 @@ static void rkp_sucompat_hook_exit(void)
 
 static void setresuid_task_work_func(struct callback_head *callback)
 {
-    struct ksu_setresuid_task_work *work =
-        container_of(callback, struct ksu_setresuid_task_work, callback);
+    struct ksu_setresuid_task_work *work = container_of(callback, struct ksu_setresuid_task_work, callback);
     ksu_handle_setresuid(work->old_uid, work->new_uid);
     kfree(work);
 }
