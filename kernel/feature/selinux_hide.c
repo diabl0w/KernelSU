@@ -602,7 +602,8 @@ static void ksu_selinux_hide_unhook()
 #else
     int ret;
     if (orig_context_write) {
-        ret = ksu_patch_text(context_write, &orig_context_write, sizeof(orig_context_write), KSU_PATCH_TEXT_FLUSH_DCACHE);
+        ret =
+            ksu_patch_text(context_write, &orig_context_write, sizeof(orig_context_write), KSU_PATCH_TEXT_FLUSH_DCACHE);
         orig_context_write = NULL;
         if (ret)
             pr_err("selinux_hide: exit: patch_text context_write err: %d\n", ret);

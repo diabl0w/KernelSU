@@ -140,15 +140,15 @@ int ksu_samsung_kdp_init(void)
         return -ENOENT;
     }
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
-    kdp_usecount_sub_and_test_fn = (kdp_usecount_sub_and_test_t)ksu_resolve_symbol_for_functable_hook(
-        "kdp_usecount_sub_and_test");
+    kdp_usecount_sub_and_test_fn =
+        (kdp_usecount_sub_and_test_t)ksu_resolve_symbol_for_functable_hook("kdp_usecount_sub_and_test");
     if (!kdp_usecount_sub_and_test_fn) {
         pr_err("Samsung KDP credential functions unavailable\n");
         return -ENOENT;
     }
 #else
-    kdp_usecount_dec_and_test_fn = (kdp_usecount_dec_and_test_t)ksu_resolve_symbol_for_functable_hook(
-        "kdp_usecount_dec_and_test");
+    kdp_usecount_dec_and_test_fn =
+        (kdp_usecount_dec_and_test_t)ksu_resolve_symbol_for_functable_hook("kdp_usecount_dec_and_test");
     if (!kdp_usecount_dec_and_test_fn) {
         pr_err("Samsung KDP credential functions unavailable\n");
         return -ENOENT;
