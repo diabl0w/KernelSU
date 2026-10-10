@@ -12,17 +12,19 @@ import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.rememberDynamicColorScheme
 
+private val AmoledBackground = Color(0xFF18191E)
+
 fun ColorScheme.amoledBackground(amoled: Boolean): ColorScheme =
     if (!amoled) this
     else copy(
-        background = Color.Black,
-        surface = Color.Black,
-        surfaceDim = Color.Black,
-        surfaceContainerLowest = Color.Black,
-        surfaceContainerLow = Color.Black,
-        surfaceContainer = Color.Black,
-        surfaceContainerHigh = Color.Black,
-        surfaceContainerHighest = Color.Black,
+        background = AmoledBackground,
+        surface = AmoledBackground,
+        surfaceDim = AmoledBackground,
+        surfaceContainerLowest = AmoledBackground,
+        surfaceContainerLow = AmoledBackground,
+        surfaceContainer = AmoledBackground,
+        surfaceContainerHigh = AmoledBackground,
+        surfaceContainerHighest = AmoledBackground,
     )
 
 @Composable
