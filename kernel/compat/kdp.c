@@ -102,7 +102,7 @@ static void __nocfi kdp_commit_worker(struct work_struct *work)
     ksu_put_cred(old_cred);
     cw->result = 0;
 
-    pr_info("KSU: KDP cred install pid=%d uid=%u euid=%u\n", task_pid_nr(cw->target), __kuid_val(ro_cred->uid),
+    pr_info("kdp: cred install pid=%d uid=%u euid=%u\n", task_pid_nr(cw->target), __kuid_val(ro_cred->uid),
             __kuid_val(ro_cred->euid));
 out:
     complete(&cw->completion);
@@ -177,7 +177,7 @@ void kdp_jb_init(void)
         return;
 #endif
     static_branch_enable(&ksu_kdp_key);
-    pr_info("KSU: Samsung KDP detected\n");
+    pr_info("kdp: Samsung KDP detected\n");
 }
 
 void kdp_jb_exit(void)

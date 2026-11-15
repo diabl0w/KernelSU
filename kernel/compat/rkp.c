@@ -12,7 +12,7 @@ void rkp_jb_init(void)
 {
     if (find_kernel_symbol_exact("rkp_started")) {
         static_branch_enable(&ksu_rkp_key);
-        pr_info("Samsung RKP detected\n");
+        pr_info("rkp: Samsung RKP detected\n");
     }
 }
 
@@ -128,7 +128,7 @@ int ksu_rkp_branch_patch(void *dst, void *src)
         ret = aarch64_insn_patch_text(&restore_addr, &insn_at_patch, 1);
         if (ret) {
             mutex_unlock(&ksu_site_lock);
-            pr_err("ksu: branch site restore failed at %pS: %d\n", current_fn, ret);
+            pr_err("rkp: branch site restore failed at %pS: %d\n", current_fn, ret);
             return ret;
         }
         if (site->insn_at_fn0) {
@@ -136,12 +136,12 @@ int ksu_rkp_branch_patch(void *dst, void *src)
             ret = aarch64_insn_patch_text(&current_fn, &insn_fn0, 1);
             if (ret) {
                 mutex_unlock(&ksu_site_lock);
-                pr_err("ksu: branch site fn+0 restore failed at %pS: %d\n", current_fn, ret);
+                pr_err("rkp: branch site fn+0 restore failed at %pS: %d\n", current_fn, ret);
                 return ret;
             }
         }
         *site = ksu_sites[--ksu_site_count];
-        pr_info("ksu: branch site removed at %pS\n", current_fn);
+        pr_info("rkp: branch site removed at %pS\n", current_fn);
         if (new_fn == current_fn) {
             mutex_unlock(&ksu_site_lock);
             return 0;
@@ -155,7 +155,7 @@ int ksu_rkp_branch_patch(void *dst, void *src)
 
     if (ksu_site_count >= KSU_MAX_BRANCH_SITES) {
         mutex_unlock(&ksu_site_lock);
-        pr_err("ksu: branch site table full\n");
+        pr_err("rkp: branch site table full\n");
         return -ENOMEM;
     }
 
@@ -175,7 +175,7 @@ int ksu_rkp_branch_patch(void *dst, void *src)
 
     if (ksu_stub_next >= (int)(PAGE_SIZE / KSU_STUB_SIZE)) {
         mutex_unlock(&ksu_site_lock);
-        pr_err("ksu: stub page full\n");
+        pr_err("rkp: stub page full\n");
         return -ENOMEM;
     }
 
@@ -196,7 +196,7 @@ int ksu_rkp_branch_patch(void *dst, void *src)
 
     if (ksu_insn_is_pc_relative(insn_at_patch)) {
         mutex_unlock(&ksu_site_lock);
-        pr_err("ksu: %pS: insn at +%d is PC-relative, cannot install\n", current_fn, preamble_skip * 4);
+        pr_err("rkp: %pS: insn at +%d is PC-relative, cannot install\n", current_fn, preamble_skip * 4);
         return -EINVAL;
     }
 
@@ -211,7 +211,7 @@ int ksu_rkp_branch_patch(void *dst, void *src)
     branch_b = ksu_encode_b(patch_addr, new_fn);
     if (!branch_b) {
         mutex_unlock(&ksu_site_lock);
-        pr_err("ksu: %pS: branch to %pS out of ±128MB range\n", patch_addr, new_fn);
+        pr_err("rkp: %pS: branch to %pS out of ±128MB range\n", patch_addr, new_fn);
         return -ERANGE;
     }
 
@@ -223,7 +223,7 @@ int ksu_rkp_branch_patch(void *dst, void *src)
     if (!b_resume) {
         ksu_stub_next--;
         mutex_unlock(&ksu_site_lock);
-        pr_err("ksu: stub → %pS resume branch out of range\n", current_fn);
+        pr_err("rkp: stub → %pS resume branch out of range\n", current_fn);
         return -ERANGE;
     }
 
@@ -259,7 +259,7 @@ int ksu_rkp_branch_patch(void *dst, void *src)
         .stub_idx = stub_idx,
         .preamble_skip = preamble_skip,
     };
-    pr_info("ksu: branch site installed: %pS → %pS (stub[%d])\n", current_fn, new_fn, stub_idx);
+    pr_info("rkp: branch site installed: %pS → %pS (stub[%d])\n", current_fn, new_fn, stub_idx);
 
     mutex_unlock(&ksu_site_lock);
     return 0;
