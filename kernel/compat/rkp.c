@@ -49,12 +49,40 @@ struct ksu_branch_site {
  *                 BTI C otherwise (valid BLR target; NOP when BTI not enforced).
  */
 #define KSU_STUB_SIZE 16
+#define KSU_STUB_MAX (PAGE_SIZE / KSU_STUB_SIZE)
 
 static struct ksu_branch_site ksu_sites[KSU_MAX_BRANCH_SITES];
 static int ksu_site_count;
 static DEFINE_MUTEX(ksu_site_lock);
 static void *ksu_stub_page;
 static int ksu_stub_next;
+
+/*
+ * Stub slots are reclaimed on unhook so repeated enable/disable cycles don't
+ * exhaust the page: freed indices are pushed here and reused before growing
+ * ksu_stub_next.  One slot is live per branch site, so at most
+ * KSU_MAX_BRANCH_SITES are ever outstanding.  All accesses under ksu_site_lock.
+ */
+static u16 ksu_stub_freelist[KSU_MAX_BRANCH_SITES];
+static int ksu_stub_free_count;
+
+static int ksu_stub_alloc(void)
+{
+    if (ksu_stub_free_count > 0)
+        return ksu_stub_freelist[--ksu_stub_free_count];
+    if (ksu_stub_next >= (int)KSU_STUB_MAX)
+        return -1;
+    return ksu_stub_next++;
+}
+
+static void ksu_stub_free(int idx)
+{
+    if (idx < 0)
+        return;
+    if (ksu_stub_free_count >= KSU_MAX_BRANCH_SITES)
+        return;
+    ksu_stub_freelist[ksu_stub_free_count++] = (u16)idx;
+}
 
 static u32 ksu_encode_b(void *from, void *to)
 {
@@ -140,6 +168,7 @@ int ksu_rkp_branch_patch(void *dst, void *src)
                 return ret;
             }
         }
+        ksu_stub_free(site->stub_idx);
         *site = ksu_sites[--ksu_site_count];
         pr_info("ksu: branch site removed at %pS\n", current_fn);
         if (new_fn == current_fn) {
@@ -171,12 +200,6 @@ int ksu_rkp_branch_patch(void *dst, void *src)
         set_memory_ro((unsigned long)ksu_stub_page, 1);
         set_memory_x((unsigned long)ksu_stub_page, 1);
 #endif
-    }
-
-    if (ksu_stub_next >= (int)(PAGE_SIZE / KSU_STUB_SIZE)) {
-        mutex_unlock(&ksu_site_lock);
-        pr_err("ksu: stub page full\n");
-        return -ENOMEM;
     }
 
     u32 fn0_insn = *(u32 *)current_fn;
@@ -215,13 +238,18 @@ int ksu_rkp_branch_patch(void *dst, void *src)
         return -ERANGE;
     }
 
-    stub_idx = ksu_stub_next++;
+    stub_idx = ksu_stub_alloc();
+    if (stub_idx < 0) {
+        mutex_unlock(&ksu_site_lock);
+        pr_err("ksu: stub page full\n");
+        return -ENOMEM;
+    }
     stub = ksu_stub_page + stub_idx * KSU_STUB_SIZE;
 
     u32 stub_landing_pad = insn_at_fn0 ? insn_at_fn0 : 0xD503245F;
     u32 b_resume = ksu_encode_b(stub + 12, stub_resume);
     if (!b_resume) {
-        ksu_stub_next--;
+        ksu_stub_free(stub_idx);
         mutex_unlock(&ksu_site_lock);
         pr_err("ksu: stub → %pS resume branch out of range\n", current_fn);
         return -ERANGE;
@@ -247,7 +275,7 @@ int ksu_rkp_branch_patch(void *dst, void *src)
         ret = aarch64_insn_patch_text(&patch_addr, &branch_b, 1);
     }
     if (ret) {
-        ksu_stub_next--;
+        ksu_stub_free(stub_idx);
         mutex_unlock(&ksu_site_lock);
         return ret;
     }
@@ -272,6 +300,7 @@ void ksu_rkp_branch_exit(void)
         ksu_exec_free(ksu_stub_page);
         ksu_stub_page = NULL;
         ksu_stub_next = 0;
+        ksu_stub_free_count = 0;
     }
 }
 
