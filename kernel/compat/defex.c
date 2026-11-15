@@ -17,8 +17,8 @@ void defex_jb_init(void)
         return;
 
     if (ksu_rkp_branch_patch(&defex_enforce_fn, &new_fn)) {
-        pr_warn("KSU: DEFEX patch failed\n");
+        pr_warn("defex: patch failed\n");
         return;
     }
-    pr_info("KSU: Samsung DEFEX detected\n");
+    pr_info("defex: Samsung DEFEX detected\n");
 }
