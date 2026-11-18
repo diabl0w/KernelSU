@@ -1,9 +1,9 @@
 use crate::defs;
-use anyhow::Result;
+use anyhow::{Context, Result, bail};
 use jwalk::{Parallelism::Serial, WalkDir};
 use std::path::Path;
 
-use anyhow::{Context, Ok};
+use anyhow::Ok;
 use extattr::{Flags as XattrFlags, lsetxattr};
 
 pub const SYSTEM_CON: &str = "u:object_r:system_file:s0";
@@ -33,6 +33,50 @@ pub fn lgetfilecon<P: AsRef<Path>>(path: P) -> Result<String> {
     Ok(con.to_string())
 }
 
+fn is_usable_existing_context(con: &str) -> bool {
+    !con.is_empty() && con != UNLABEL_CON
+}
+
+pub fn label_ksud<P: AsRef<Path>>(path: P) -> Result<()> {
+    let path = path.as_ref();
+    let inherited = lgetfilecon(path).context("Failed to read inherited ksud SELinux context")?;
+
+    match lsetxattr(path, SELINUX_XATTR, KSU_CON, XattrFlags::empty()) {
+        std::result::Result::Ok(()) => {}
+        Err(error) if error.0 == libc::EINVAL => {
+            // Samsung SEPF can reject the dynamically added ksu_file type.
+            // A newly copied file already has a context from the active policy,
+            // so retain that context instead of forcing another vendor type.
+            if is_usable_existing_context(&inherited) {
+                log::warn!(
+                    "SELinux policy rejected {KSU_CON}; retaining inherited context {inherited}"
+                );
+            } else {
+                lsetfilecon(path, SYSTEM_CON).with_context(|| {
+                    format!(
+                        "ksu_file is unavailable and inherited context {inherited:?} is unusable; fallback to {SYSTEM_CON} failed"
+                    )
+                })?;
+            }
+        }
+        Err(error) => {
+            return Err(error).with_context(|| {
+                format!(
+                    "Failed to change SELinux context for {} to {KSU_CON}",
+                    path.display()
+                )
+            });
+        }
+    }
+
+    let actual = lgetfilecon(path).context("Failed to verify ksud SELinux context")?;
+    if !is_usable_existing_context(&actual) {
+        bail!("ksud has unusable SELinux context {actual:?}");
+    }
+    log::info!("ksud SELinux label: requested={KSU_CON}, inherited={inherited}, actual={actual}");
+    Ok(())
+}
+
 pub fn setsyscon<P: AsRef<Path>>(path: P) -> Result<()> {
     lsetfilecon(path, SYSTEM_CON)
 }
@@ -59,7 +103,7 @@ fn restore_syscon_if_unlabeled<P: AsRef<Path>>(dir: P) -> Result<()> {
 }
 
 pub fn restorecon() -> Result<()> {
-    lsetfilecon(defs::DAEMON_PATH, KSU_CON)?;
+    label_ksud(defs::DAEMON_PATH)?;
     restore_syscon_if_unlabeled(defs::MODULE_DIR)?;
     Ok(())
 }

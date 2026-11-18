@@ -86,6 +86,22 @@ int ksu_install_fd(void)
     return ksu_install_fd_with_permissions(O_CLOEXEC, 0);
 }
 
+int ksu_install_fd_to_user(int __user *outp)
+{
+    int fd = ksu_install_fd();
+
+    if (fd < 0)
+        return fd;
+
+    if (copy_to_user(outp, &fd, sizeof(fd))) {
+        pr_err("install ksu fd reply err\n");
+        ksu_close_fd(fd);
+        return -EFAULT;
+    }
+
+    return 0;
+}
+
 int ksu_install_su_fd(void)
 {
     // This descriptor must be installed after the exec into ksud.
@@ -102,13 +118,9 @@ bool ksu_is_su_session_fd(const struct file *filp)
 static void ksu_install_fd_tw_func(struct callback_head *cb)
 {
     struct ksu_install_fd_tw *tw = container_of(cb, struct ksu_install_fd_tw, cb);
-    int fd = ksu_install_fd();
+    int ret = ksu_install_fd_to_user(tw->outp);
 
-    pr_info("[%d] install ksu fd: %d\n", current->pid, fd);
-    if (copy_to_user(tw->outp, &fd, sizeof(fd))) {
-        pr_err("install ksu fd reply err\n");
-        ksu_close_fd(fd);
-    }
+    pr_info("[%d] install ksu fd through reboot kprobe: %d\n", current->pid, ret);
 
     kfree(tw);
 }
@@ -152,7 +164,7 @@ void __init ksu_supercalls_init(void)
 
     rc = register_kprobe(&reboot_kp);
     if (rc) {
-        pr_err("reboot kprobe failed: %d\n", rc);
+        pr_warn("reboot kprobe failed: %d; syscall-dispatch fallback remains available\n", rc);
     } else {
         pr_info("reboot kprobe registered successfully\n");
     }

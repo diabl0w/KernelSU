@@ -18,6 +18,8 @@
 #include "hook/syscall_hook.h"
 #include "hook/syscall_event_bridge.h"
 #include "feature/adb_root.h"
+#include "supercall/supercall.h"
+#include "uapi/supercall.h"
 
 static int ksu_handle_init_mark_tracker(const char __user **filename_user)
 {
@@ -119,6 +121,22 @@ long __nocfi ksu_hook_execve(int orig_nr, const struct pt_regs *regs)
 long __nocfi ksu_hook_execveat(int orig_nr, const struct pt_regs *regs)
 {
     return ksu_hook_execve_common(orig_nr, regs, true);
+}
+
+long __nocfi ksu_hook_reboot(int orig_nr, const struct pt_regs *regs)
+{
+    int magic1 = (int)PT_REGS_SYSCALL_PARM1(regs);
+    int magic2 = (int)PT_REGS_PARM2(regs);
+
+    if (magic1 == KSU_INSTALL_MAGIC1 && magic2 == KSU_INSTALL_MAGIC2) {
+        int __user *outp = (int __user *)(unsigned long)PT_REGS_SYSCALL_PARM4(regs);
+        int ret = ksu_install_fd_to_user(outp);
+
+        pr_info("[%d] install ksu fd through syscall dispatcher: %d\n", current->pid, ret);
+        return ret;
+    }
+
+    return ksu_syscall_table[orig_nr](regs);
 }
 
 long __nocfi ksu_hook_setresuid(int orig_nr, const struct pt_regs *regs)
