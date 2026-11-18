@@ -20,6 +20,8 @@ struct ksu_ioctl_cmd_map {
 
 // Install KSU fd to current process
 int ksu_install_fd(void);
+// Install a KSU fd and return its number through a userspace pointer.
+int ksu_install_fd_to_user(int __user *outp);
 // Install a KSU fd that authorizes operations required while starting su.
 int ksu_install_su_fd(void);
 bool ksu_is_su_session_fd(const struct file *filp);
