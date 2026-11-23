@@ -10,6 +10,7 @@ DEFINE_STATIC_KEY_FALSE(ksu_rkp_key);
 
 void rkp_jb_init(void)
 {
+    return; /* LOCAL PATCH: disable Samsung RKP hooks on SM-A065F */
     if (find_kernel_symbol_exact("rkp_started")) {
         static_branch_enable(&ksu_rkp_key);
         pr_info("Samsung RKP detected\n");

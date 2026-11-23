@@ -155,6 +155,7 @@ int ksu_commit_creds(struct cred *cred)
 
 void kdp_jb_init(void)
 {
+    return; /* LOCAL PATCH: disable Samsung KDP hooks on SM-A065F */
     prepare_ro_creds_fn = (prepare_ro_creds_t)ksu_resolve_symbol_for_functable_hook("prepare_ro_creds");
     kdp_assign_pgd_fn = (kdp_assign_pgd_t)ksu_resolve_symbol_for_functable_hook("kdp_assign_pgd");
     if (!prepare_ro_creds_fn || !kdp_assign_pgd_fn)
