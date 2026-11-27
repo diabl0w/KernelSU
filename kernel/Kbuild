@@ -1,3 +1,18 @@
+# KCFI. The module is built against DDK/GKI kernel trees, which set CONFIG_CFI_CLANG=y,
+# so every indirect call in this module carries a kCFI type check. Kernels can ship
+# the opposite configuration (CONFIG_CFI_CLANG=n): Samsung/MTK android15-6.6 on
+# SM-A055F reports "# CONFIG_CFI_CLANG is not set". Neither their kernel functions nor
+# our own __nocfi helpers carry a type hash, so any indirect call out of a CFI-enabled
+# module function traps with "Internal error: BRK handler: f2008228".
+#
+# Default stays CFI-enabled, matching GKI. Build with KSU_MODULE_CFI=0 (opt-in) for
+# kernels that do not enforce KCFI.
+KSU_MODULE_CFI ?= 1
+
+ifeq ($(KSU_MODULE_CFI),0)
+ccflags-y += -fno-sanitize=kcfi
+endif
+
 kernelsu-objs := core/init.o
 
 kernelsu-objs += compat/jailbreak.o compat/kdp.o compat/defex.o compat/rkp.o
