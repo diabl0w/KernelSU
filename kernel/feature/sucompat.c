@@ -88,7 +88,16 @@ static bool is_ksud_exists()
     return true;
 }
 
-long ksu_handle_faccessat_sucompat(int orig_nr, struct pt_regs *regs)
+/*
+ * These handlers call ksu_syscall_table[orig_nr](regs). The table entry is one of
+ * our own __nocfi hooks (ksu_hook_faccessat / ksu_hook_newfstatat / ksu_hook_execve*),
+ * so a KCFI type check emitted here compares the compiled-in prototype hash against
+ * whatever bytes happen to precede a __nocfi target and traps:
+ *   Internal error: BRK handler: f2008228 (kCFI)
+ *   pc: ksu_handle_stat_sucompat+0x68/0x17c
+ * Marking the callers __nocfi drops the check, which is what these functions need.
+ */
+long __nocfi ksu_handle_faccessat_sucompat(int orig_nr, struct pt_regs *regs)
 {
     const char __user **filename_user, *orig_filename;
     long ret;
@@ -123,7 +132,7 @@ do_orig_facessat:
     return ksu_syscall_table[orig_nr](regs);
 }
 
-long ksu_handle_stat_sucompat(int orig_nr, struct pt_regs *regs)
+long __nocfi ksu_handle_stat_sucompat(int orig_nr, struct pt_regs *regs)
 {
     const char __user **filename_user, *orig_filename;
     long ret;
@@ -158,9 +167,9 @@ do_orig_stat:
     return ksu_syscall_table[orig_nr](regs);
 }
 
-static long ksu_handle_execve_sucompat_common(const char __user **filename_user,
-                                              const char __user *const __user *argv_user, unsigned long envp,
-                                              bool execveat, int orig_nr, struct pt_regs *regs)
+static long __nocfi ksu_handle_execve_sucompat_common(const char __user **filename_user,
+                                                      const char __user *const __user *argv_user, unsigned long envp,
+                                                      bool execveat, int orig_nr, struct pt_regs *regs)
 {
     const char __user *fn;
     struct ksu_sulog_pending_event *pending_sucompat = NULL;
