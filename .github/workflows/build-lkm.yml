@@ -17,6 +17,11 @@ on:
         required: false
         default: ''
         type: string
+      module_cfi:
+        description: '1 = kCFI module build, 0 = no kCFI (kernels with CONFIG_CFI_CLANG=n)'
+        required: false
+        default: '0'
+        type: string
   workflow_dispatch:
 jobs:
   build-lkm:
@@ -37,3 +42,4 @@ jobs:
       package_name: ${{ inputs.package_name || '' }}
       expected_size: ${{ inputs.expected_size || '' }}
       expected_hash: ${{ inputs.expected_hash || '' }}
+      module_cfi: ${{ inputs.module_cfi || '0' }}

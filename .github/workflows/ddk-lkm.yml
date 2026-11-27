@@ -27,6 +27,11 @@ on:
         required: false
         default: ''
         type: string
+      module_cfi:
+        description: '1 = build the module with kCFI checks (GKI kernels), 0 = no KCFI (Samsung/MTK kernels with CONFIG_CFI_CLANG=n)'
+        required: false
+        default: '0'
+        type: string
 
 jobs:
   build-kernelsu-ko:
@@ -45,6 +50,7 @@ jobs:
         PACKAGE_NAME: ${{ inputs.package_name }}
         EXPECTED_SIZE: ${{ inputs.expected_size }}
         EXPECTED_HASH: ${{ inputs.expected_hash }}
+        MODULE_CFI: ${{ inputs.module_cfi }}
       run: |
         git config --global --add safe.directory /__w/KernelSU/KernelSU
 
@@ -61,6 +67,12 @@ jobs:
         fi
         if [ -n "$EXPECTED_HASH" ]; then
           EXTRA_ARGS="$EXTRA_ARGS KSU_EXPECTED_HASH=$EXPECTED_HASH"
+        fi
+        # Kernels built with CONFIG_CFI_CLANG=n (Samsung/MTK android15-6.6, e.g.
+        # SM-A055F) have no kCFI hashes, so a module compiled with checks traps on
+        # the first indirect call. Pass KSU_MODULE_CFI=0 for those targets.
+        if [ -n "$MODULE_CFI" ]; then
+          EXTRA_ARGS="$EXTRA_ARGS KSU_MODULE_CFI=$MODULE_CFI"
         fi
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           EXTRA_ARGS="$EXTRA_ARGS KSU_IS_PR_BUILD=1"
